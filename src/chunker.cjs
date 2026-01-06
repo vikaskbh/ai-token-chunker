@@ -73,6 +73,31 @@ function chunkInput(text, images, limits, options = {}) {
   let chunkIndex = 0;
 
   while (currentIndex < text.length) {
+    // Check if remaining text exceeds limits and cannot be split
+    const remainingText = text.slice(currentIndex);
+    const remainingBytes = getTextByteSize(remainingText);
+    const remainingBytesWithImages = remainingBytes + (chunkIndex === 0 ? imageBytes : 0);
+    
+    // If remaining text exceeds limits and we can't split it further, throw error
+    if (remainingBytesWithImages > limits.maxBytes && remainingText.length <= 1) {
+      throw new LimitExceededError({
+        provider: options.provider,
+        model: options.model,
+        limit: 'maxBytes',
+        actual: remainingBytesWithImages,
+        allowed: limits.maxBytes,
+      });
+    }
+    if (remainingText.length > limits.maxChars && remainingText.length <= 1) {
+      throw new LimitExceededError({
+        provider: options.provider,
+        model: options.model,
+        limit: 'maxChars',
+        actual: remainingText.length,
+        allowed: limits.maxChars,
+      });
+    }
+    
     const isFirstChunk = chunkIndex === 0;
     const maxChunkBytes = isFirstChunk
       ? availableBytesForText
@@ -84,7 +109,6 @@ function chunkInput(text, images, limits, options = {}) {
     const estimatedMaxChars = Math.floor(maxChunkBytes / 2);
     const targetChars = Math.min(maxChunkChars, estimatedMaxChars);
 
-    const remainingText = text.slice(currentIndex);
     let splitPoint;
 
     if (remainingText.length <= targetChars) {

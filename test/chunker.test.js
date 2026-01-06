@@ -252,20 +252,22 @@ test('chunkPrompt - metadata accuracy', () => {
 });
 
 test('chunkPrompt - single text chunk exceeding limits throws LimitExceededError', () => {
-  // Create text that exceeds maxChars limit
-  const longText = 'A'.repeat(1000);
+  // Test unsplittable scenario: single character with images that exceed limits
+  const largeImage = Buffer.alloc(1000000); // 1MB image
+  const singleChar = 'A';
   
   assert.throws(
     () => {
       chunkPrompt({
         provider: 'openai',
         model: 'gpt-4o',
-        input: longText,
+        input: singleChar,
+        images: [largeImage],
         options: {
           customLimits: {
-            maxBytes: 1000000, // Large enough
-            maxChars: 100, // Too small for our text
-            maxTokens: 1000000, // Large enough
+            maxBytes: 100, // Too small for image + text
+            maxChars: 1000,
+            maxTokens: 1000,
             maxImages: 10,
             imageByteLimit: 20000000,
           },
@@ -275,20 +277,18 @@ test('chunkPrompt - single text chunk exceeding limits throws LimitExceededError
     LimitExceededError
   );
 
-  // Create text that exceeds maxBytes limit
-  const multiByteText = '🚀'.repeat(1000); // Each emoji is ~4 bytes
-  
+  // Test unsplittable scenario: maxChars is 0 (impossible to chunk)
   assert.throws(
     () => {
       chunkPrompt({
         provider: 'openai',
         model: 'gpt-4o',
-        input: multiByteText,
+        input: 'A',
         options: {
           customLimits: {
-            maxBytes: 100, // Too small
-            maxChars: 1000000, // Large enough
-            maxTokens: 1000000, // Large enough
+            maxBytes: 1000000,
+            maxChars: 0, // Cannot chunk - even 1 char exceeds
+            maxTokens: 1000000,
             maxImages: 10,
             imageByteLimit: 20000000,
           },
