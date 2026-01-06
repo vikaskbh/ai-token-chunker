@@ -1,0 +1,51 @@
+{
+  "name": "ai-token-chunker",
+  "version": "1.0.0",
+  "description": "Safely split prompts across multiple AI providers without breaking token or byte limits",
+  "main": "./src/index.cjs",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "require": "./src/index.cjs",
+      "default": "./src/index.js"
+    }
+  },
+  "files": [
+    "src/**/*.js",
+    "src/**/*.cjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/**/*.test.js",
+    "example": "node examples/basic.js"
+  },
+  "keywords": [
+    "ai",
+    "llm",
+    "token",
+    "chunking",
+    "prompt",
+    "openai",
+    "anthropic",
+    "gemini",
+    "mistral",
+    "cohere",
+    "groq",
+    "azure",
+    "bedrock",
+    "together",
+    "ollama"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  }
+}
+
