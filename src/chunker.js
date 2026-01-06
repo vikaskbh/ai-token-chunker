@@ -4,7 +4,7 @@
 
 import { estimateTokens, getTextByteSize, checkFits } from './limits.js';
 import { getImagesByteSize } from './image.js';
-import { InvalidInputError } from './errors.js';
+import { InvalidInputError, LimitExceededError } from './errors.js';
 
 /**
  * Find the best split point in text
@@ -67,10 +67,58 @@ export function chunkInput(text, images, limits, options = {}) {
     Math.floor(availableBytesForText / 2) // Rough estimate: 2 bytes per char
   );
 
+  // Check if even a single character would exceed limits (unsplittable chunk)
+  // This prevents infinite loops and provides clear error messages
+  const singleCharBytes = getTextByteSize('A'); // Test with a single character
+  const singleCharWithImages = singleCharBytes + imageBytes;
+  if (singleCharWithImages > limits.maxBytes) {
+    throw new LimitExceededError({
+      provider: options.provider,
+      model: options.model,
+      limit: 'maxBytes',
+      actual: singleCharWithImages,
+      allowed: limits.maxBytes,
+    });
+  }
+  if (1 > limits.maxChars) {
+    throw new LimitExceededError({
+      provider: options.provider,
+      model: options.model,
+      limit: 'maxChars',
+      actual: 1,
+      allowed: limits.maxChars,
+    });
+  }
+
   let currentIndex = 0;
   let chunkIndex = 0;
 
   while (currentIndex < text.length) {
+    // Check if remaining text exceeds limits and cannot be split
+    const remainingText = text.slice(currentIndex);
+    const remainingBytes = getTextByteSize(remainingText);
+    const remainingBytesWithImages = remainingBytes + (chunkIndex === 0 ? imageBytes : 0);
+    
+    // If remaining text exceeds limits and we can't split it further, throw error
+    if (remainingBytesWithImages > limits.maxBytes && remainingText.length <= 1) {
+      throw new LimitExceededError({
+        provider: options.provider,
+        model: options.model,
+        limit: 'maxBytes',
+        actual: remainingBytesWithImages,
+        allowed: limits.maxBytes,
+      });
+    }
+    if (remainingText.length > limits.maxChars && remainingText.length <= 1) {
+      throw new LimitExceededError({
+        provider: options.provider,
+        model: options.model,
+        limit: 'maxChars',
+        actual: remainingText.length,
+        allowed: limits.maxChars,
+      });
+    }
+    
     // Determine max chunk size
     // First chunk can include images, subsequent chunks cannot
     const isFirstChunk = chunkIndex === 0;
@@ -87,7 +135,6 @@ export function chunkInput(text, images, limits, options = {}) {
     const targetChars = Math.min(maxChunkChars, estimatedMaxChars);
 
     // Find where to split
-    const remainingText = text.slice(currentIndex);
     let splitPoint;
 
     if (remainingText.length <= targetChars) {
@@ -161,11 +208,15 @@ export function chunkInput(text, images, limits, options = {}) {
     chunkIndex++;
 
     // Safety: prevent infinite loops
+    // This should not happen if the pre-check above works, but keep as fallback
     if (splitPoint === 0) {
-      throw new InvalidInputError(
-        'Unable to chunk input: single character exceeds limits',
-        { provider: options.provider, model: options.model }
-      );
+      throw new LimitExceededError({
+        provider: options.provider,
+        model: options.model,
+        limit: 'maxBytes',
+        actual: totalChunkBytes,
+        allowed: maxChunkBytes,
+      });
     }
   }
 

@@ -16,8 +16,26 @@ export function normalizeImage(image) {
   if (Buffer.isBuffer(image)) {
     buffer = image;
   } else if (typeof image === 'string') {
-    // Assume base64
-    buffer = Buffer.from(image, 'base64');
+    // Handle data URLs: data:image/*;base64,<base64-data>
+    if (image.startsWith('data:image/')) {
+      const commaIndex = image.indexOf(',');
+      if (commaIndex === -1) {
+        throw new Error('Invalid data URL format. Expected data:image/*;base64,<data>');
+      }
+      const header = image.slice(0, commaIndex);
+      const base64Data = image.slice(commaIndex + 1);
+      
+      // Extract MIME type from header
+      const mimeMatch = header.match(/data:image\/([^;]+)/);
+      if (mimeMatch) {
+        mime = `image/${mimeMatch[1]}`;
+      }
+      
+      buffer = Buffer.from(base64Data, 'base64');
+    } else {
+      // Assume plain base64 string
+      buffer = Buffer.from(image, 'base64');
+    }
   } else if (image && image.buffer) {
     buffer = Buffer.isBuffer(image.buffer)
       ? image.buffer

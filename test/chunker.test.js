@@ -251,3 +251,84 @@ test('chunkPrompt - metadata accuracy', () => {
   assert.strictEqual(result.metadata.totalChunks, result.chunks.length);
 });
 
+test('chunkPrompt - single text chunk exceeding limits throws LimitExceededError', () => {
+  // Create text that exceeds maxChars limit
+  const longText = 'A'.repeat(1000);
+  
+  assert.throws(
+    () => {
+      chunkPrompt({
+        provider: 'openai',
+        model: 'gpt-4o',
+        input: longText,
+        options: {
+          customLimits: {
+            maxBytes: 1000000, // Large enough
+            maxChars: 100, // Too small for our text
+            maxTokens: 1000000, // Large enough
+            maxImages: 10,
+            imageByteLimit: 20000000,
+          },
+        },
+      });
+    },
+    LimitExceededError
+  );
+
+  // Create text that exceeds maxBytes limit
+  const multiByteText = '🚀'.repeat(1000); // Each emoji is ~4 bytes
+  
+  assert.throws(
+    () => {
+      chunkPrompt({
+        provider: 'openai',
+        model: 'gpt-4o',
+        input: multiByteText,
+        options: {
+          customLimits: {
+            maxBytes: 100, // Too small
+            maxChars: 1000000, // Large enough
+            maxTokens: 1000000, // Large enough
+            maxImages: 10,
+            imageByteLimit: 20000000,
+          },
+        },
+      });
+    },
+    LimitExceededError
+  );
+});
+
+test('chunkPrompt - image count exceeding provider limit throws ImageLimitError', () => {
+  const images = Array(11).fill(Buffer.from('fake-image-data')); // OpenAI gpt-4o allows max 10
+
+  assert.throws(
+    () => {
+      chunkPrompt({
+        provider: 'openai',
+        model: 'gpt-4o',
+        input: 'Test',
+        images,
+      });
+    },
+    ImageLimitError
+  );
+
+  // Verify error has correct properties
+  try {
+    chunkPrompt({
+      provider: 'openai',
+      model: 'gpt-4o',
+      input: 'Test',
+      images,
+    });
+    assert.fail('Should have thrown ImageLimitError');
+  } catch (error) {
+    assert(error instanceof ImageLimitError);
+    assert.strictEqual(error.code, 'IMAGE_LIMIT_EXCEEDED');
+    assert.strictEqual(error.reason, 'maxImages exceeded');
+    assert.strictEqual(error.actual, 11);
+    assert.strictEqual(error.allowed, 10);
+  }
+});
+

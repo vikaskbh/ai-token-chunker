@@ -4,6 +4,11 @@
 
 /**
  * Default provider limits
+ * 
+ * NOTE: These limits are heuristics and conservative estimates based on public documentation.
+ * Actual limits may vary by provider, region, or API version. Use customLimits option to override
+ * for your specific use case or when provider documentation indicates different values.
+ * 
  * All limits are conservative estimates based on public documentation
  */
 export const PROVIDER_LIMITS = {

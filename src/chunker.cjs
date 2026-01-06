@@ -4,7 +4,7 @@
 
 const { estimateTokens, getTextByteSize, checkFits } = require('./limits.cjs');
 const { getImagesByteSize } = require('./image.cjs');
-const { InvalidInputError } = require('./errors.cjs');
+const { InvalidInputError, LimitExceededError } = require('./errors.cjs');
 
 function findSplitPoint(text, maxLength) {
   if (maxLength >= text.length) {
@@ -45,6 +45,29 @@ function chunkInput(text, images, limits, options = {}) {
     limits.maxChars,
     Math.floor(availableBytesForText / 2)
   );
+
+  // Check if even a single character would exceed limits (unsplittable chunk)
+  // This prevents infinite loops and provides clear error messages
+  const singleCharBytes = getTextByteSize('A'); // Test with a single character
+  const singleCharWithImages = singleCharBytes + imageBytes;
+  if (singleCharWithImages > limits.maxBytes) {
+    throw new LimitExceededError({
+      provider: options.provider,
+      model: options.model,
+      limit: 'maxBytes',
+      actual: singleCharWithImages,
+      allowed: limits.maxBytes,
+    });
+  }
+  if (1 > limits.maxChars) {
+    throw new LimitExceededError({
+      provider: options.provider,
+      model: options.model,
+      limit: 'maxChars',
+      actual: 1,
+      allowed: limits.maxChars,
+    });
+  }
 
   let currentIndex = 0;
   let chunkIndex = 0;
@@ -122,11 +145,22 @@ function chunkInput(text, images, limits, options = {}) {
 
     chunkIndex++;
 
+    // Safety: prevent infinite loops
+    // This should not happen if the pre-check above works, but keep as fallback
     if (splitPoint === 0) {
-      throw new InvalidInputError(
-        'Unable to chunk input: single character exceeds limits',
-        { provider: options.provider, model: options.model }
-      );
+      const chunkBytes = getTextByteSize(chunkText);
+      const chunkImageBytes = isFirstChunk ? imageBytes : 0;
+      const totalChunkBytes = chunkBytes + chunkImageBytes;
+      const maxChunkBytes = isFirstChunk
+        ? availableBytesForText
+        : limits.maxBytes;
+      throw new LimitExceededError({
+        provider: options.provider,
+        model: options.model,
+        limit: 'maxBytes',
+        actual: totalChunkBytes,
+        allowed: maxChunkBytes,
+      });
     }
   }
 

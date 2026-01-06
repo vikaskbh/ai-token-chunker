@@ -85,6 +85,12 @@ export function chunkPrompt({ provider, model, input, images, options = {} }) {
     };
   }
 
+  // Before chunking, verify that chunking is possible
+  // If the input is so large that even after chunking it would exceed limits,
+  // we should detect this. However, since we can always split text, this check
+  // is mainly for the unsplittable case (single character exceeding limits).
+  // The chunkInput function will handle this internally.
+  
   // Need to chunk
   const chunks = chunkInput(input, normalizedImages, limits, {
     ...options,
