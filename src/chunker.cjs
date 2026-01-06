@@ -123,7 +123,23 @@ function chunkInput(text, images, limits, options = {}) {
 
     let chunkText = remainingText.slice(0, splitPoint);
 
+    // Enforce "Single Unit Overflow" failure - detect unsplittable chunks immediately
+    // This check must run before binary search begins
     const chunkBytes = getTextByteSize(chunkText);
+    
+    if (
+      chunkText.length > limits.maxChars ||
+      chunkBytes > maxChunkBytes
+    ) {
+      throw new LimitExceededError({
+        provider: options.provider,
+        model: options.model,
+        limit: chunkBytes > maxChunkBytes ? 'maxBytes' : 'maxChars',
+        actual: Math.max(chunkText.length, chunkBytes),
+        allowed: Math.min(limits.maxChars, maxChunkBytes),
+      });
+    }
+
     const chunkImageBytes = isFirstChunk ? imageBytes : 0;
     const totalChunkBytes = chunkBytes + chunkImageBytes;
 
